@@ -7,5 +7,5 @@ variable "domain" {
 }
 
 variable "subdomain" {
-  default = "www"
+  default = "funkysymbol"
 }

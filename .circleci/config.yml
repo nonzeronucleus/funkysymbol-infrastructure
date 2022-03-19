@@ -95,7 +95,7 @@ jobs:
 
         - run:
             name: Deploy from S3
-            command: aws s3 sync s3://ip-terraform-cache/nonzeronucleus.nonzeronucleus.com/  ~/terraform/environments/production
+            command: aws s3 sync s3://ip-terraform-cache/funkysymbol.nonzeronucleus.com/  ~/terraform/environments/production
 
         - persist_to_workspace:
             # Must be an absolute path, or relative path from working_directory. This is a directory on the container which is
@@ -166,7 +166,7 @@ jobs:
 
         - run:
             name: Deploy to S3
-            command: aws s3 sync ~/terraform/production  s3://ip-terraform-cache/nonzeronucleus.nonzeronucleus.com/ --delete
+            command: aws s3 sync ~/terraform/production  s3://ip-terraform-cache/funkysymbol.nonzeronucleus.com/ --delete
 
   plan-destroy:
     docker:
