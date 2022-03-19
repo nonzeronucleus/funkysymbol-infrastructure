@@ -7,6 +7,6 @@ variable "domain" {
 }
 
 variable "subdomain" {
-  default = "covid-data"
+  default = "funkysymbol"
   # default = "tftest2"
 }
