@@ -3,7 +3,7 @@ variable "aws_region" {
 }
 
 variable "domain" {
-  default = "nonzeronuclus.com"
+  default = "nonzeronucleus.com"
 }
 
 variable "subdomain" {
