@@ -82,7 +82,7 @@ apply_job: &apply_job
 jobs:
   import_tf:
       docker:
-          - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
+          - image: circleci/node:lts
 
       steps:
         - run:
@@ -154,7 +154,7 @@ jobs:
 
   export_tf:
       docker:
-          - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
+          - image: circleci/node:lts
 
       steps:
         - attach_workspace:
@@ -170,7 +170,7 @@ jobs:
 
   plan-destroy:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
+      - image: circleci/node:lts
     steps:
       - attach_workspace:
            at: ~/terraform
@@ -185,7 +185,7 @@ jobs:
 
   destroy:
     docker:
-      - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
+      - image: circleci/node:lts
     steps:
       - attach_workspace:
           at: .
