@@ -8,5 +8,4 @@ variable "domain" {
 
 variable "subdomain" {
   default = "funkysymbol"
-  # default = "tftest2"
 }

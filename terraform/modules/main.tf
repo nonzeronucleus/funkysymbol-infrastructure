@@ -11,11 +11,14 @@ data "aws_acm_certificate" "cert" {
 # http://stackoverflow.com/a/5048129/2966951
 resource "aws_s3_bucket" "site" {
   bucket = "${var.subdomain}.${var.domain}"
-  acl = "public-read"
+
   tags = {
     site = "${var.subdomain}.${var.domain}"
   }
+}
 
+resource "aws_s3_bucket_policy" "site" {
+  bucket = aws_s3_bucket.site.id
 
   policy = <<EOF
 {
@@ -32,9 +35,27 @@ resource "aws_s3_bucket" "site" {
 }
 EOF
 
-  website {
-      index_document = "index.html"
+}
+
+resource "aws_s3_bucket_acl" "site" {
+  bucket = aws_s3_bucket.site.id
+  acl = "public-read"
+}
+
+resource "aws_s3_bucket_website_configuration" "site" {
+  bucket = aws_s3_bucket.site.id
+  index_document {
+      suffix = "index.html"
   }
+}
+
+
+resource "aws_s3_bucket_accelerate_configuration" "site" {
+  bucket = aws_s3_bucket.site.id
+  status = "Enabled"
+
+
+
 }
 
 data "aws_route53_zone" "main" {
@@ -105,6 +126,10 @@ resource "aws_cloudfront_distribution" "cdn" {
       acm_certificate_arn = "${data.aws_acm_certificate.cert.arn}"
       ssl_support_method ="sni-only"
   }
+}
+
+output "s3_website_endpoint" {
+  value = "${aws_s3_bucket.site.website_endpoint}"
 }
 
 
