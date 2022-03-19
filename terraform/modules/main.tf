@@ -50,7 +50,7 @@ resource "aws_s3_bucket_website_configuration" "site" {
 }
 
 
-resource "aws_s3_bucket_configuration" "site" {
+resource "aws_s3_bucket_accelerate_configuration" "site" {
   bucket = aws_s3_bucket.site.id
   status = "Enabled"
 }
