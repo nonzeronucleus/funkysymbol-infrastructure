@@ -3,7 +3,7 @@ variable "aws_region" {
 }
 
 variable "domain" {
-  default = "funkysymbol.com"
+  default = "nonzeronuclus.com"
 }
 
 variable "subdomain" {
