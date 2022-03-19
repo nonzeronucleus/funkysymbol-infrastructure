@@ -1,179 +1,43 @@
 version: 2
 
-references:
-
-base_image: &base_image
-  hashicorp/terraform:light
-
-working_directory: &working_directory
-  ~/example
-
-default_config: &default_config
-  docker:
-    - image: *base_image
-  working_directory: *working_directory
-  environment:
-    BASH_ENV: /root/.bashrc
-
-repo_cache_key: &repo_cache_key
-  v2-repo-{{ .Branch }}-{{ .Revision }}
-
-# Step to restore repository from cache
-restore_repo: &restore_repo
-  restore_cache:
-    key: *repo_cache_key
-
-save_repo: &save_repo
-  save_cache:
-    key: *repo_cache_key
-    paths:
-      - *working_directory
-
-set_terraform_environment: &set_terraform_environment
-  run:
-    name: set terraform environment
-    command: |
-      cd && touch $BASH_ENV
-      if [ "${CIRCLE_BRANCH}" == "main" ]; then
-        echo 'export TERRAFORM_ENVIRONMENT=production' >> $BASH_ENV
-      else
-        echo 'export TERRAFORM_ENVIRONMENT=staging' >> $BASH_ENV
-      fi
-
-terraform_init: &terraform_init
-  run:
-    name: terraform init
-    command: |
-      source $BASH_ENV
-      cd terraform/environments/$TERRAFORM_ENVIRONMENT
-      terraform init
-
-apply_job: &apply_job
-  <<: *default_config
-  steps:
-    - *restore_repo
-    - *set_terraform_environment
-    - *terraform_init
-    - attach_workspace:
-        at: *working_directory
-
-    - run:
-        name: terraform apply
-        command: |
-          source $BASH_ENV
-          cd terraform/environments/$TERRAFORM_ENVIRONMENT
-          terraform apply --auto-approve ../../../terraform.plan
-
-    - store_artifacts:
-        path: terraform/environments/production/terraform.tfstate
-        destination: terraform.tfstate
-
-    - persist_to_workspace:
-        # Must be an absolute path, or relative path from working_directory. This is a directory on the container which is
-    # taken to be the root directory of the workspace.
-        root: terraform/environments/
-        # Must be relative path from root
-        paths:
-            - production/terraform.tfstate
-
-
-
-
 jobs:
-  import_tf:
-      docker:
-          - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
-
-      steps:
-        - run:
-            name: Install aws cli
-            command: sudo apt-get -y -qq install awscli
-
-        - run:
-            name: Create dir
-            command: mkdir -p ~/terraform/environments/production
-
-        - run:
-            name: Deploy from S3
-            command: aws s3 sync s3://ip-terraform-cache/funkysymbol.nonzeronucleus.com/  ~/terraform/environments/production
-
-        - persist_to_workspace:
-            # Must be an absolute path, or relative path from working_directory. This is a directory on the container which is
-        # taken to be the root directory of the workspace.
-            root: ~/
-            # Must be relative path from root
-            paths:
-                - terraform/environments/production
-
-
-  build:
-    <<: *default_config
+  plan-apply:
+    working_directory: /tmp/project
+    docker:
+      - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
     steps:
       - checkout
-      - *set_terraform_environment
       - run:
+          name: terraform init & plan
           command: |
-            source $BASH_ENV
-
-            if [ $(terraform fmt | grep -v .terraform | tee fmt_result.txt | wc -l) -gt 0 ]; then
-              echo "Format of this terraform files is not appropiate:"
-              echo
-              cat fmt_result.txt
-              rm fmt_result.txt
-              git checkout -- .
-              echo
-              echo "Please run terraform fmt"
-              exit 1
-            else
-              echo "All good"
-            fi
-      - *save_repo
-
-  plan:
-    <<: *default_config
-    steps:
-      - *restore_repo
-      - *set_terraform_environment
-      - *terraform_init
-      - attach_workspace:
-          at: *working_directory
-
-      - run:
-          name: terraform plan
-          command: |
-            source $BASH_ENV
-            cd terraform/environments/$TERRAFORM_ENVIRONMENT
-            terraform plan -out=../../../terraform.plan
+            terraform init -upgrade -input=false
+            terraform plan -out tfapply -var-file variables.tfvars
       - persist_to_workspace:
-          root: *working_directory
+          root: .
           paths:
-            - terraform.plan
-      - store_artifacts:
-          path: terraform.plan
-          destination: terraform.plan
+            - .
 
-  export_tf:
-      docker:
-          - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
-
-      steps:
-        - attach_workspace:
-            at: ~/terraform
-
-        - run:
-            name: Install aws cli
-            command: sudo apt-get -y -qq install awscli
-
-        - run:
-            name: Deploy to S3
-            command: aws s3 sync ~/terraform/production  s3://ip-terraform-cache/funkysymbol.nonzeronucleus.com/ --delete
+  apply:
+    docker:
+      - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: terraform
+          command: |
+            terraform apply -auto-approve tfapply
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
 
   plan-destroy:
     docker:
       - image: docker.mirror.hashicorp.services/hashicorp/terraform:light
     steps:
       - attach_workspace:
-           at: ~/terraform
+          at: .
       - run:
           name: terraform create destroy plan
           command: |
@@ -194,55 +58,25 @@ jobs:
           command: |
             terraform apply -auto-approve tfdestroy
 
-  apply:
-    <<: *apply_job
-  apply-with-approval:
-    <<: *apply_job
-
 workflows:
   version: 2
-  build_plan_approve_apply:
+  plan_approve_apply:
     jobs:
-      - import_tf:
-          context: AWS
-          filters:
-            branches:
-              only: main
-      - build:
-          context: AWS
-          requires:
-            - import_tf
-      - plan:
-          context: AWS
-          requires:
-            - build
-      - approve:
-          context: AWS
+      - plan-apply
+      - hold-apply:
           type: approval
           requires:
-            - plan
-          filters:
-            branches:
-              only: main
-      - apply-with-approval:
-          context: AWS
-          requires:
-            - approve
-          filters:
-            branches:
-              only: main
+            - plan-apply
       - apply:
-          context: AWS
           requires:
-            - plan
-          filters:
-            branches:
-              only: staging
-      - export_tf:
-          context: AWS
+            - hold-apply
+      - plan-destroy:
           requires:
-            - apply-with-approval
-          filters:
-            branches:
-              only: main
-
+            - apply
+      - hold-destroy:
+          type: approval
+          requires:
+            - plan-destroy
+      - destroy:
+          requires:
+            - hold-destroy
